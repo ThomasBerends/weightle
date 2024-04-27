@@ -1,0 +1,398 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <!-- Required meta tags -->
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, shrink-to-fit=no">
+
+    <title>⏲️ Weightle</title>
+
+    <style>
+        body {
+            font-family: system-ui,
+                -apple-system,
+                "Segoe UI",
+                Roboto,
+                "Helvetica Neue",
+                "Noto Sans",
+                "Liberation Sans",
+                Arial,
+                sans-serif,
+                "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+
+            padding: 1rem;
+
+            background-color: #333333;
+            color: #ffffff;
+        }
+
+        .container {
+            text-align: center;
+            max-width: 400px;
+            margin-left: auto;
+            margin-right: auto;
+        }
+
+        table {
+            width: 100%;
+        }
+
+        tr > :first-child {
+            text-align: right;
+        }
+
+        tr > :last-child {
+            text-align: left;
+        }
+
+        td {
+            width: 50%;
+            padding: 0.2rem;
+        }
+
+        input {
+            width: 5rem;
+        }
+
+        table tr:last-child td {
+            text-align: center;
+        }
+
+        input[type="radio"], input[type="checkbox"] {
+            width: 1rem;
+        }
+
+        #result-container {
+            background: #666666;
+            border-radius: 1rem;
+            padding: 1rem;
+        }
+
+        .hidden {
+            display: none;
+        }
+
+        a, a:link, a:visited, a:hover, a:focus, a:active {
+            color: #fff;
+        }
+
+        td a {
+            text-decoration: none;
+        }
+    </style>
+</head>
+<body>
+<div class="container">
+    <h1>⏲️ Weightle Week #<span id="week"></span></h1>
+    <hr></hr>
+    <p>Share your weight loss/gain journey in a fun way.</p>
+    <form id="form">
+        <table>
+            <tr>
+                <td><label for="start">Start weight</label></td>
+                <td>
+                    <input name="start"
+                           id="start"
+                           type="number"
+                           min="1"
+                           max="9999"
+                           step="1"
+                           onkeypress="return event.charCode >= 48 && event.charCode <= 57"
+                           title="Numbers only"> <a href="#" onclick="toggleLock('start')" class="lock hidden"><span class="closed">🔒</span><span class="open">🔓</span></a>
+                </td>
+            </tr>
+            <tr>
+                <td><label for="goal">Goal weight</label></td>
+                <td>
+                    <input name="goal"
+                           id="goal"
+                           type="number"
+                           min="1"
+                           max="9999"
+                           step="1"
+                           onkeypress="return event.charCode >= 48 && event.charCode <= 57"
+                           title="Numbers only"> <a href="#" onclick="toggleLock('goal')" class="lock hidden"><span class="closed">🔒</span><span class="open">🔓</span></a>
+                </td>
+            </tr>
+            <tr class="hidden">
+                <td><label for="last">Last weight</label></td>
+                <td>
+                    <input name="last"
+                           id="last"
+                           type="number"
+                           min="1"
+                           max="9999"
+                           step="1"
+                           onkeypress="return event.charCode >= 48 && event.charCode <= 57"
+                           title="Numbers only"> <a href="#" onclick="toggleLock('last')" class="lock hidden"><span class="closed">🔒</span><span class="open">🔓</span></a>
+                </td>
+            </tr>
+            <tr>
+                <td><label for="current">Current weight</label></td>
+                <td>
+                    <input name="current"
+                           id="current"
+                           type="number"
+                           min="1"
+                           max="9999"
+                           step="1"
+                           onkeypress="return event.charCode >= 48 && event.charCode <= 57"
+                           title="Numbers only">
+                </td>
+            </tr>
+            <tr>
+                <td colspan="2">
+                    <input type="radio" id="kg" name="unit" value="kg" /><label for="kg"> kg</label>
+                    <input type="radio" id="lbs" name="unit" value="lbs" /><label for="lbs"> lbs</label>
+                </td>
+            </tr>
+        </table>
+        <p>
+            <input type="submit" value="Generate!" />
+        </p>
+    </form>
+    <div id="result-container" class="hidden">
+        <div id="result">
+
+        </div>
+        <p><input type="submit" value="Copy!" id="copy" /></p>
+        <p>
+            <span id="per-block"></span> <span id="unit"></span> per 🟩
+            </p>
+        <p>
+            <input type="checkbox" id="show-numbers" name="show-numbers" value="yes" /><label for="show-numbers"> Show numbers below</label>
+        </p>
+    </div>
+    <p>Created by <a href="https://thomasto.space/">ThomasToSpace</a></p>
+</div>
+<script>
+    // Migrations / first visit values
+    if(localStorage.getItem('show-numbers') === null) {
+        localStorage.setItem('show-numbers', 'true');
+    }
+
+    // Fetch items from localStorage
+    document.getElementById('start').value = localStorage.getItem('start');
+    if(localStorage.getItem('start') !== null) {
+        lock('start');
+    }
+    document.getElementById('goal').value = localStorage.getItem('goal');
+    if(localStorage.getItem('goal') !== null) {
+        lock('goal');
+    }
+    document.getElementById('current').value = localStorage.getItem('current');
+    document.getElementById('last').value = localStorage.getItem('last');
+    if(
+        localStorage.getItem('last') !== null
+    ) {
+        const lastInput = document.getElementById('last');
+        lastInput.parentElement.parentElement.classList.remove('hidden');
+        lock('last');
+    }
+    document.getElementById('kg').checked = (localStorage.getItem('unit') === 'kg')
+    document.getElementById('lbs').checked = (localStorage.getItem('unit') === 'lbs')
+
+    // Put weeknumber at top
+    const today = new Date();
+    const firstDayOfYear = new Date(today.getFullYear(), 0, 1);
+    const pastDays = (today - firstDayOfYear) / 86400000;
+    const weekNumber = Math.ceil((pastDays + firstDayOfYear.getDay() + 1) / 7).toString();
+    document.getElementById('week').innerHTML = weekNumber;
+
+
+    if(
+        localStorage.getItem('current') !== null &&
+        localStorage.getItem('week') !== null &&
+        localStorage.getItem('week') !== weekNumber
+    ) {
+        const lastInput = document.getElementById('last');
+        lastInput.parentElement.parentElement.classList.remove('hidden');
+        lastInput.value = localStorage.getItem('current');
+        lock('last');
+    }
+
+    let resultParts = [];
+
+    // Handle submit
+    function submit(event) {
+        // Get values from form
+        const start = parseInt(document.getElementById('start').value);
+        const goal = parseInt(document.getElementById('goal').value);
+        let last = null;
+        if(document.getElementById('last').value !== "") {
+            last = parseInt(document.getElementById('last').value);
+        }
+        const current = parseInt(document.getElementById('current').value);
+        const selectedRadio = document.querySelector('input[name="unit"]:checked');
+        const unit = selectedRadio ? selectedRadio.value : null;
+
+        // If start or goal has changed, reset per-block.
+        if(start !== parseInt(localStorage.getItem('start')) || goal !== parseInt(localStorage.getItem('goal'))) {
+            if(localStorage.getItem('per-block') !== null) {
+                localStorage.removeItem('per-block');
+            }
+        }
+
+        // Put values into localStorage
+        localStorage.setItem('start', start.toString());
+        localStorage.setItem('goal', goal.toString());
+        if(last !== null) {
+            localStorage.setItem('last', last.toString());
+        }
+        localStorage.setItem('current', current.toString());
+        localStorage.setItem('unit', unit);
+        localStorage.setItem('week', weekNumber);
+
+        generateResult();
+
+        event.preventDefault();
+    }
+
+    function generateResult() {
+        const start = parseInt(localStorage.getItem('start'));
+        const goal = parseInt(localStorage.getItem('goal'));
+        const current = parseInt(localStorage.getItem('current'));
+        const unit = localStorage.getItem('unit');
+        const weekNumber = parseInt(localStorage.getItem('week'));
+        const perBlockStored = localStorage.getItem('per-block');
+        let last = null;
+        if(localStorage.getItem('last') !== null) {
+            last = parseInt(localStorage.getItem('last'));
+        }
+
+        document.getElementById('unit').innerHTML = unit;
+
+        if( (start < current && goal < current) || (start > current && goal > current)) {
+            alert("Current weight needs to be between start & goal");
+            return false;
+        }
+
+        if (start === goal) {
+            alert("Start & goal can't be the same")
+            return false;
+        }
+
+        // Calculate values
+        let total = start - goal;
+        let done = start - current;
+        let doneLastWeek = done;
+        if(last !== null) {
+            doneLastWeek = start - last;
+        }
+
+        let perBlockValue = Math.ceil(total / 48);
+        if(perBlockStored !== null) {
+            perBlockValue = parseInt(perBlockStored);
+        } else {
+            localStorage.setItem('per-block', perBlockValue.toString());
+        }
+        document.getElementById('per-block').innerHTML = perBlockValue.toString();
+
+        if(goal > start) {
+            total = goal - start;
+            done = current - start;
+            doneLastWeek = last - start;
+        }
+
+        // TODO: Do not show ✅ when there is no last yet
+        // Generate result string
+        let totalBlocks = Math.ceil(total / perBlockValue);
+        let doneBlocks = Math.floor(done / perBlockValue);
+        if(total === done) {
+            doneBlocks = totalBlocks;
+        }
+        let doneLastWeekBlocks = Math.floor(doneLastWeek / perBlockValue);
+
+        var result = '🟩'.repeat(doneLastWeekBlocks) +
+            '✅'.repeat(doneBlocks - doneLastWeekBlocks) +
+            '⬛'.repeat(totalBlocks - doneBlocks);
+
+        // Start generating result
+        resultParts = ["⏲️ #Weightle Week #" + weekNumber];
+
+        // Split result string into parts, add them to result array
+        let totalResult = [...result].length;
+        let leftoverResult = [...result].length;
+        let lines = 8;
+        if(totalResult <= 42) { lines = 7; }
+        if(totalResult <= 30) { lines = 6; }
+        if(totalResult <= 20) { lines = 5; }
+        if(totalResult <= 16) { lines = 4; }
+        if(totalResult <= 9) { lines = 3; }
+        if(totalResult <= 6) { lines = 2; }
+        if(totalResult <= 3) { lines = 1; }
+        for (var i = 0; i < lines; i = i + 1) {
+            let lineSize = Math.ceil(leftoverResult / (lines - i));
+
+            resultParts.push(
+                Array.from(result).slice(totalResult - leftoverResult, totalResult - leftoverResult + lineSize).join('')
+            );
+
+            leftoverResult = leftoverResult - lineSize;
+        }
+
+        // Add metadata at end
+        if(localStorage.getItem('show-numbers') === "true") {
+            resultParts.push('Goal: ' + goal + unit + ' Current: ' + current + unit);
+        }
+        resultParts.push('https://thomasto.space/weightle/');
+
+        document.getElementById('result').innerHTML = resultParts.join('<br>');
+        document.getElementById('result-container').classList.remove('hidden');
+    }
+
+    const form = document.getElementById("form");
+    form.addEventListener("submit", submit);
+
+    const copy = document.getElementById("copy");
+
+    function copyResult(event) {
+        navigator.clipboard.writeText(resultParts.join("\n"));
+        copy.setAttribute('value', 'Copied!');
+
+        setTimeout(function() {
+            copy.setAttribute('value', 'Copy');
+        }, 600);
+
+        event.preventDefault();
+    }
+    copy.addEventListener("click", copyResult);
+
+    function onShowNumbersChange(event) {
+        localStorage.setItem('show-numbers', showNumbers.checked ? 'true' : 'false');
+        generateResult();
+
+        event.preventDefault();
+    }
+    const showNumbers = document.getElementById('show-numbers');
+    showNumbers.checked = (localStorage.getItem('show-numbers') === 'true');
+    showNumbers.addEventListener('change', onShowNumbersChange);
+
+    function toggleLock(id) {
+        const element = document.getElementById(id);
+        if(element.disabled) {
+            unlock(id);
+        } else {
+            lock(id);
+        }
+    }
+
+    function lock(id) {
+        const element = document.getElementById(id);
+        element.disabled = true;
+        const lockA = element.parentElement.getElementsByTagName('a')[0];
+        lockA.classList.remove('hidden');
+        lockA.getElementsByClassName('closed')[0].classList.remove('hidden');
+        lockA.getElementsByClassName('open')[0].classList.add('hidden');
+    }
+
+    function unlock(id) {
+        const element = document.getElementById(id);
+        element.disabled = false;
+        const lockA = element.parentElement.getElementsByTagName('a')[0];
+        lockA.getElementsByClassName('open')[0].classList.remove('hidden');
+        lockA.getElementsByClassName('closed')[0].classList.add('hidden');
+    }
+</script>
+</body>
+</html>
